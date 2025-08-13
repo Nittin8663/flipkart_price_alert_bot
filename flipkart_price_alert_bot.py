@@ -10,7 +10,6 @@ with open("config.json", "r") as f:
     config = json.load(f)
 
 CHECK_INTERVAL = config["check_interval"]
-alert_sent = {}
 
 def get_price(url):
     chrome_options = Options()
@@ -39,20 +38,19 @@ def get_price(url):
 def main():
     while True:
         for product in config["products"]:
+            name = product.get("name", "Unknown Product")
             url = product["url"]
             target_price = product["target_price"]
 
-            if url not in alert_sent:
-                alert_sent[url] = False
+            print(f"\nChecking price for: {name}")
+            print(f"Product link: {url}")
 
-            print(f"Checking price for: {url}")
             price = get_price(url)
 
             if price:
                 print(f"Current price: ₹{price}")
-                if price <= target_price and not alert_sent[url]:
-                    send_telegram_message(f"Price Alert! ₹{price}\n{url}")
-                    alert_sent[url] = True
+                if price <= target_price:
+                    send_telegram_message(f"📢 Price Alert! {name} is now ₹{price}\n{url}")
                     print("Alert sent to Telegram!")
             else:
                 print("Failed to fetch price.")
