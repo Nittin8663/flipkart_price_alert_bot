@@ -1,165 +1,47 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>Flipkart Price Alert</title>
-  <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
-    h1 { margin-bottom: 8px; }
-    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-    th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; }
-    th { background: #f3f4f6; font-weight: 600; }
-    .actions button { margin-right: 8px; }
-    .enabled { color: #059669; font-weight: 600; }
-    .disabled { color: #dc2626; font-weight: 600; }
-    .price-cell { cursor: pointer; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #eef2ff; font-size: 12px; }
-    .row { display: flex; gap: 8px; margin-top: 12px; }
-    input[type="text"], input[type="number"] { padding: 8px; width: 100%; box-sizing: border-box; }
-    button { padding: 8px 12px; cursor: pointer; }
-    .hint { color: #6b7280; font-size: 12px; }
-  </style>
+    <title>Flipkart Price Alert Bot</title>
+    <style>
+        table { border-collapse: collapse; width: 80%; margin: auto; }
+        th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
+        form { display: inline; }
+        input[type="number"], input[type="text"] { padding: 5px; }
+        button { padding: 5px 10px; margin: 2px; }
+    </style>
 </head>
 <body>
-  <h1>Flipkart Price Alert Bot</h1>
-  <div class="hint">Checking every {{ interval }} seconds. Click a <b>Target Price</b> to edit inline.</div>
+    <h1 style="text-align:center;">Flipkart Price Alert Bot</h1>
+    
+    <h2 style="text-align:center;">Add Product</h2>
+    <form method="POST" action="/add" style="text-align:center;">
+        <input type="text" name="name" placeholder="Product Name" required>
+        <input type="text" name="url" placeholder="Product URL" required>
+        <input type="number" name="target_price" placeholder="Target Price" required>
+        <button type="submit">Add</button>
+    </form>
 
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Name</th>
-        <th>URL</th>
-        <th>Target Price (₹)</th>
-        <th>Status</th>
-        <th class="actions">Actions</th>
-      </tr>
-    </thead>
-    <tbody id="tbody">
-      {% for p in products %}
-      <tr data-index="{{ loop.index0 }}">
-        <td>{{ loop.index }}</td>
-        <td>{{ p.name }}</td>
-        <td><a href="{{ p.url }}" target="_blank">Open</a></td>
-        <td class="price-cell"><span class="price-text">{{ p.target_price }}</span></td>
-        <td>
-          {% if p.enabled %}
-            <span class="enabled">Enabled</span>
-          {% else %}
-            <span class="disabled">Disabled</span>
-          {% endif %}
-        </td>
-        <td class="actions">
-          <button onclick="toggleItem({{ loop.index0 }})">Toggle</button>
-          <button onclick="deleteItem({{ loop.index0 }})">Delete</button>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <h3>Add New Product</h3>
-  <div class="row">
-    <input id="name" type="text" placeholder="Product name" />
-    <input id="url" type="text" placeholder="Flipkart URL" />
-    <input id="target" type="number" placeholder="Target price (₹)" />
-    <button onclick="addItem()">Add</button>
-  </div>
-
-<script>
-  // Inline edit target price
-  document.querySelectorAll(".price-cell").forEach(function(cell) {
-    cell.addEventListener("click", function(e) {
-      const row = e.currentTarget.closest("tr");
-      const index = parseInt(row.dataset.index);
-      const span = e.currentTarget.querySelector(".price-text");
-      const current = span.textContent.trim();
-
-      // prevent multiple inputs
-      if (e.currentTarget.querySelector("input")) return;
-
-      const input = document.createElement("input");
-      input.type = "number";
-      input.value = current;
-      input.style.width = "120px";
-      input.onkeydown = function(ev) {
-        if (ev.key === "Enter") savePrice(index, input.value, span, input);
-        if (ev.key === "Escape") cancelEdit(span, input);
-      };
-      input.onblur = function() {
-        savePrice(index, input.value, span, input);
-      };
-
-      span.style.display = "none";
-      e.currentTarget.appendChild(input);
-      input.focus();
-      input.select();
-    });
-  });
-
-  function cancelEdit(span, input) {
-    input.remove();
-    span.style.display = "";
-  }
-
-  function savePrice(index, value, span, input) {
-    if (!value) { cancelEdit(span, input); return; }
-    fetch("/update_price", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ index: index, target_price: value })
-    }).then(r => r.json()).then(d => {
-      if (d.ok) {
-        span.textContent = value;
-      } else {
-        alert(d.msg || "Failed to update");
-      }
-      cancelEdit(span, input);
-    }).catch(() => {
-      alert("Network error");
-      cancelEdit(span, input);
-    });
-  }
-
-  function addItem() {
-    const name = document.getElementById("name").value.trim();
-    const url = document.getElementById("url").value.trim();
-    const target = document.getElementById("target").value.trim();
-    if (!name || !url || !target) {
-      alert("Please fill all fields.");
-      return;
-    }
-    fetch("/add", {
-      method: "POST",
-      body: new URLSearchParams({ name, url, target_price: target })
-    }).then(r => r.json()).then(d => {
-      if (d.ok) location.reload();
-      else alert(d.msg || "Failed to add");
-    });
-  }
-
-  function deleteItem(index) {
-    if (!confirm("Delete this product?")) return;
-    fetch("/delete", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ index })
-    }).then(r => r.json()).then(d => {
-      if (d.ok) location.reload();
-      else alert(d.msg || "Failed to delete");
-    });
-  }
-
-  function toggleItem(index) {
-    fetch("/toggle", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ index })
-    }).then(r => r.json()).then(d => {
-      if (d.ok) location.reload();
-      else alert(d.msg || "Failed to toggle");
-    });
-  }
-</script>
+    <h2 style="text-align:center;">Product List</h2>
+    <table>
+        <tr>
+            <th>Name</th>
+            <th>Target Price</th>
+            <th>Actions</th>
+        </tr>
+        {% for product in products %}
+        <tr>
+            <td><a href="{{ product.url }}" target="_blank">{{ product.name }}</a></td>
+            <td>
+                <form method="POST" action="/edit/{{ loop.index0 }}">
+                    <input type="number" name="target_price" value="{{ product.target_price }}" required>
+                    <button type="submit">Update</button>
+                </form>
+            </td>
+            <td>
+                <a href="/delete/{{ loop.index0 }}"><button type="button">Delete</button></a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
 </body>
 </html>
