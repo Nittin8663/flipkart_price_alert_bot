@@ -1,58 +1,142 @@
 import time
 import json
+import threading
+import requests
+from flask import Flask, render_template_string, request, redirect
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from telegram_utils import send_telegram_message
 
-# Load config
-with open("config.json", "r") as f:
+# Load configs
+with open("config.json") as f:
     config = json.load(f)
 
-CHECK_INTERVAL = config["check_interval"]
+# Telegram settings
+TELEGRAM_BOT_TOKEN = config["TELEGRAM_BOT_TOKEN"]
+TELEGRAM_CHAT_ID = config["TELEGRAM_CHAT_ID"]
+CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
-def get_prices(driver, products):
-    results = []
-    for product in products:
-        name = product.get("name", "Unknown Product")
-        url = product["url"]
-        target_price = product["target_price"]
+# Flask app
+app = Flask(__name__)
 
-        print(f"\nChecking price for: {name}")
-        print(f"Product link: {url}")
+# HTML Template
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>Flipkart Price Alert</title>
+<style>
+body { font-family: Arial; margin: 40px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background-color: #f2f2f2; }
+input[type=text], input[type=number] { width: 100%; padding: 5px; }
+button { padding: 5px 10px; }
+</style>
+</head>
+<body>
+<h2>Flipkart Price Alert Bot</h2>
+<table>
+<tr><th>Name</th><th>URL</th><th>Target Price</th><th>Enabled</th><th>Actions</th></tr>
+{% for p in products %}
+<tr>
+<td>{{ p.name }}</td>
+<td><a href="{{ p.url }}" target="_blank">Link</a></td>
+<td>{{ p.target_price }}</td>
+<td>{{ '✅' if p.enabled else '❌' }}</td>
+<td>
+<a href="/toggle/{{ loop.index0 }}">Toggle</a> |
+<a href="/delete/{{ loop.index0 }}">Delete</a>
+</td>
+</tr>
+{% endfor %}
+</table>
+<h3>Add New Product</h3>
+<form method="post" action="/add">
+<input type="text" name="name" placeholder="Product Name" required>
+<input type="text" name="url" placeholder="Flipkart URL" required>
+<input type="number" name="target_price" placeholder="Target Price" required>
+<button type="submit">Add</button>
+</form>
+</body>
+</html>
+"""
 
-        try:
-            driver.get(url)
-            time.sleep(5)  # wait for page load
+def load_products():
+    with open("products.json") as f:
+        return json.load(f)
 
-            price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
-            price_text = price_element.text.replace("₹", "").replace(",", "")
-            price = int(price_text)
-            print(f"Current price: ₹{price}")
+def save_products(products):
+    with open("products.json", "w") as f:
+        json.dump(products, f, indent=4)
 
-            if price <= target_price:
-                send_telegram_message(f"📢 Price Alert! {name} is now ₹{price}\n{url}")
-                print("Alert sent to Telegram!")
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    requests.post(url, data=data)
 
-        except Exception as e:
-            print(f"Error fetching price for {name}: {e}")
-
-def main():
+def get_price(url):
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_argument("--disable-infobars")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(url)
+    time.sleep(5)
+    try:
+        price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
+        price_text = price_element.text.replace("₹", "").replace(",", "")
+        driver.quit()
+        return int(price_text)
+    except:
+        driver.quit()
+        return None
 
+def price_checker():
     while True:
-        driver = webdriver.Chrome(options=chrome_options)  # open once per cycle
-        get_prices(driver, config["products"])
-        driver.quit()  # close after all products are checked
-
+        products = load_products()
+        for product in products:
+            if not product["enabled"]:
+                continue
+            print(f"Checking price for: {product['url']}")
+            price = get_price(product["url"])
+            if price:
+                print(f"Current price: ₹{price}")
+                if price <= product["target_price"]:
+                    send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
         time.sleep(CHECK_INTERVAL)
 
+@app.route("/")
+def index():
+    products = load_products()
+    return render_template_string(HTML, products=products)
+
+@app.route("/add", methods=["POST"])
+def add():
+    products = load_products()
+    products.append({
+        "name": request.form["name"],
+        "url": request.form["url"],
+        "target_price": int(request.form["target_price"]),
+        "enabled": True
+    })
+    save_products(products)
+    return redirect("/")
+
+@app.route("/delete/<int:index>")
+def delete(index):
+    products = load_products()
+    products.pop(index)
+    save_products(products)
+    return redirect("/")
+
+@app.route("/toggle/<int:index>")
+def toggle(index):
+    products = load_products()
+    products[index]["enabled"] = not products[index]["enabled"]
+    save_products(products)
+    return redirect("/")
+
 if __name__ == "__main__":
-    main()
+    threading.Thread(target=price_checker, daemon=True).start()
+    app.run(host="0.0.0.0", port=5000)
