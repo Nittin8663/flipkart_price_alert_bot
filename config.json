@@ -1,17 +1,5 @@
 {
-    "telegram_bot_token": "8213851536:AAFXJenYJZrzKLWzCPx81DO2XrAdroGkjl0",
-    "telegram_chat_id": "6018830024",
-    "check_interval": 60,
-    "products": [
-        {
-            "name": "Samsung Galaxy S24 128GB",
-            "url": "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH",
-            "target_price": 47000
-        },
-        {
-            "name": "Samsung Galaxy S24 256GB",
-            "url": "https://www.flipkart.com/samsung-galaxy-s24-5g-marble-gray-256-gb/p/itmda5af919bff3a?pid=MOBH5TKXJBNXDGRE",
-            "target_price": 44000
-        }
-    ]
+    "TELEGRAM_BOT_TOKEN": "8213851536:AAFXJenYJZrzKLWzCPx81DO2XrAdroGkjl0",
+    "TELEGRAM_CHAT_ID": "6018830024",
+    "CHECK_INTERVAL": 60
 }
