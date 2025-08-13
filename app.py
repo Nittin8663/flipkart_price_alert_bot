@@ -5,12 +5,11 @@ import requests
 from flask import Flask, render_template, request, redirect
 from bs4 import BeautifulSoup
 
-# Telegram Bot Setup
-TELEGRAM_BOT_TOKEN = "8213851536:AAFXJenYJZrzKLWzCPx81DO2XrAdroGkjl0"
-TELEGRAM_CHAT_ID = "6018830024"
-
-# JSON Storage
+# ------------------ CONFIG ------------------ #
+TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"
 PRODUCTS_FILE = "products.json"
+CHECK_INTERVAL = 60  # seconds
 
 app = Flask(__name__)
 
@@ -19,9 +18,7 @@ def load_products():
     try:
         with open(PRODUCTS_FILE, "r") as f:
             return json.load(f)
-    except FileNotFoundError:
-        return []
-    except json.JSONDecodeError:
+    except (FileNotFoundError, json.JSONDecodeError):
         return []
 
 def save_products(products):
@@ -38,50 +35,48 @@ def send_telegram_message(message):
 
 def get_price(url):
     headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers, timeout=10)
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    # Try Flipkart's common price selectors
-    price_tag = soup.select_one("._30jeq3._16Jk6d")
-    if price_tag:
-        return int(price_tag.text.replace("₹", "").replace(",", "").strip())
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        price_tag = soup.select_one("._30jeq3._16Jk6d")  # Flipkart price selector
+        if price_tag:
+            return int(price_tag.text.replace("₹", "").replace(",", "").strip())
+    except Exception as e:
+        print(f"Error fetching price: {e}")
     return None
 
 # ------------------ Price Checker ------------------ #
 def price_checker():
     while True:
         products = load_products()
-        updated = False
-
         for p in products:
             if not p.get("enabled", True):
                 continue
 
-            print(f"Checking price for: {p['name']}")
             price = get_price(p["url"])
             p["current_price"] = price
 
             if price is not None:
+                print(f"Checking price for: {p['name']}")
                 print(f"Current price: ₹{price}")
                 if price <= p["target_price"]:
                     send_telegram_message(
                         f"Price Alert! {p['name']} is now ₹{price}\n{p['url']}"
                     )
-
-            updated = True
-
-        if updated:
-            save_products(products)
-
-        time.sleep(60)
+        save_products(products)
+        time.sleep(CHECK_INTERVAL)
 
 # ------------------ Flask Routes ------------------ #
 @app.route("/")
 def index():
     products = load_products()
+    # Fetch current price on page load
     for p in products:
-        if "current_price" not in p:
+        try:
             p["current_price"] = get_price(p["url"])
+        except:
+            p["current_price"] = None
+    save_products(products)
     return render_template("index.html", products=products)
 
 @app.route("/add", methods=["POST"])
@@ -91,7 +86,8 @@ def add():
         "name": request.form["name"],
         "url": request.form["url"],
         "target_price": int(request.form["target_price"]),
-        "enabled": True
+        "enabled": True,
+        "current_price": None
     })
     save_products(products)
     return redirect("/")
