@@ -6,11 +6,11 @@ from selenium.webdriver.common.by import By
 
 # ====== CONFIG ======
 FLIPKART_URL = "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH"
-TARGET_PRICE = 60000  # Set your desired alert price
+TARGET_PRICE = 47000  # Set your desired alert price
 
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
-CHECK_INTERVAL = 3600  # seconds between checks
+TELEGRAM_BOT_TOKEN = "8213851536:AAFXJenYJZrzKLWzCPx81DO2XrAdroGkjl0"
+TELEGRAM_CHAT_ID = "6018830024"
+CHECK_INTERVAL = 60  # seconds between checks
 # =====================
 
 def send_telegram_message(message):
