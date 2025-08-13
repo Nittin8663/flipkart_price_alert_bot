@@ -1,49 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Flipkart Price Alerts</title>
+    <title>Flipkart Price Tracker</title>
     <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
         table { border-collapse: collapse; width: 100%; }
-        th, td { padding: 8px; border: 1px solid #ccc; text-align: left; }
-        form { display: inline; }
-        .disabled { background-color: #fdd; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f4f4f4; }
+        .disabled { background-color: #f8d7da; }
+        input[type="number"] { width: 100px; }
     </style>
 </head>
 <body>
-<h1>Flipkart Price Alert Bot</h1>
+    <h1>Flipkart Price Tracker</h1>
 
-<h2>Add Product</h2>
-<form method="post" action="/add">
-    Name: <input name="name" required>
-    URL: <input name="url" size="50" required>
-    Target Price: <input name="target_price" type="number" required>
-    <button type="submit">Add</button>
-</form>
-
-<h2>Product List</h2>
-<table>
-<tr>
-    <th>Name</th>
-    <th>URL</th>
-    <th>Target Price</th>
-    <th>Status</th>
-    <th>Actions</th>
-</tr>
-{% for i, p in enumerate(products) %}
-<tr class="{{ '' if p.enabled else 'disabled' }}">
-    <form method="post" action="/edit/{{ i }}">
-        <td><input name="name" value="{{ p.name }}"></td>
-        <td><input name="url" value="{{ p.url }}" size="50"></td>
-        <td><input name="target_price" type="number" value="{{ p.target_price }}"></td>
-        <td>{{ 'Enabled' if p.enabled else 'Disabled' }}</td>
-        <td>
-            <button type="submit">Save</button>
+    <h2>Add Product</h2>
+    <form method="post" action="/add">
+        <input name="name" placeholder="Product Name" required>
+        <input name="url" placeholder="Flipkart Product URL" size="50" required>
+        <input name="target_price" type="number" placeholder="Target Price" required>
+        <button type="submit">Add</button>
     </form>
-    <a href="/toggle/{{ i }}">Toggle</a>
-    <a href="/delete/{{ i }}" onclick="return confirm('Delete this product?')">Delete</a>
-    </td>
-</tr>
-{% endfor %}
-</table>
+
+    <h2>Products</h2>
+    <table>
+        <tr>
+            <th>Name</th>
+            <th>URL</th>
+            <th>Target Price</th>
+            <th>Current Price</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+        {% for p in products %}
+        <tr class="{{ '' if p.enabled else 'disabled' }}">
+            <form method="post" action="/edit/{{ loop.index0 }}">
+                <td><input name="name" value="{{ p.name }}"></td>
+                <td><input name="url" value="{{ p.url }}" size="50"></td>
+                <td><input name="target_price" type="number" value="{{ p.target_price }}"></td>
+                <td>{{ p.current_price if p.current_price else 'N/A' }}</td>
+                <td>{{ 'Enabled' if p.enabled else 'Disabled' }}</td>
+                <td>
+                    <button type="submit">Save</button>
+            </form>
+            <a href="/toggle/{{ loop.index0 }}">Toggle</a>
+            <a href="/delete/{{ loop.index0 }}" onclick="return confirm('Delete this product?')">Delete</a>
+                </td>
+        </tr>
+        {% endfor %}
+    </table>
 </body>
 </html>
