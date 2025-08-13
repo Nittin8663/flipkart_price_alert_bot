@@ -1,16 +1,14 @@
 [
-  {
-    "name": "Samsung Galaxy S24 5G Onyx Black 128GB",
-    "url": "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH",
-    "target_price": 60000,
-    "enabled": true,
-    "current_price": null
-  },
-  {
-    "name": "Samsung Galaxy S24 5G Marble Gray 256GB",
-    "url": "https://www.flipkart.com/samsung-galaxy-s24-5g-marble-gray-256-gb/p/itmda5af919bff3a?pid=MOBH5TKXJBNXDGRE",
-    "target_price": 55000,
-    "enabled": true,
-    "current_price": null
-  }
+    {
+        "name": "Samsung Galaxy S24 128GB Onyx Black",
+        "url": "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH",
+        "target_price": 60000,
+        "enabled": true
+    },
+    {
+        "name": "Samsung Galaxy S24 256GB Marble Gray",
+        "url": "https://www.flipkart.com/samsung-galaxy-s24-5g-marble-gray-256-gb/p/itmda5af919bff3a?pid=MOBH5TKXJBNXDGRE",
+        "target_price": 55000,
+        "enabled": true
+    }
 ]
