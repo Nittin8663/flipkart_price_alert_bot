@@ -3,13 +3,11 @@ import threading
 import time
 import requests
 from flask import Flask, render_template, request, redirect
-from selenium.webdriver.common.by import By
+from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
-# Use undetected_chromedriver if you face bot detection issues
-import undetected_chromedriver as uc
 
 # ------------------ CONFIG ------------------ #
 TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
@@ -46,14 +44,13 @@ def get_price(url):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    
-    driver = uc.Chrome(options=options)  # undetected Chrome
+
+    driver = webdriver.Chrome(options=options)
 
     try:
         driver.get(url)
         wait = WebDriverWait(driver, 15)
 
-        # possible price selectors
         selectors = ["._30jeq3._16Jk6d", "._30jeq3", "._16Jk6d", "._1vC4OE._3qQ9m1"]
         price_tag = None
         for sel in selectors:
