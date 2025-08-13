@@ -6,8 +6,8 @@ from flask import Flask, render_template, request, redirect
 from bs4 import BeautifulSoup
 
 # Telegram Bot Setup
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"
+TELEGRAM_BOT_TOKEN = "8213851536:AAFXJenYJZrzKLWzCPx81DO2XrAdroGkjl0"
+TELEGRAM_CHAT_ID = "6018830024"
 
 # JSON Storage
 PRODUCTS_FILE = "products.json"
