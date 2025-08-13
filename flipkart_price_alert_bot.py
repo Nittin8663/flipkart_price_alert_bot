@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 
 # --- CONFIG ---
-PRODUCT_URL = "https://www.flipkart.com/apple-iphone-15-pro-max-blue-titanium-256-gb/p/itm6e1c11f5b6f0e"  # change to your product URL
+PRODUCT_URL = "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH&lid=LSTMOBHYJ6QFUNQYFDHVZACEH&marketplace=FLIPKART&q=s24&store=tyy%2F4io&srno=s_1_2&otracker=search&otracker1=search&fm=organic&iid=d4afac7f-f2f2-49fe-b92f-10c5966135f9.MOBHYJ6QFUNQYFDH.SEARCH&ppt=None&ppn=None&ssid=gtzu13tw8g0000001755064743419&qH=08eca8f85ffc96a4"  # change to your product URL
 TARGET_PRICE = 150000  # change to your desired price
 TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
 CHAT_ID = "YOUR_CHAT_ID"
