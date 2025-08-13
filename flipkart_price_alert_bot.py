@@ -1,70 +1,60 @@
 import time
-import tempfile
 import requests
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
-# --- CONFIG ---
-PRODUCT_URL = "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH"
-TARGET_PRICE = 45999  # Your desired price
-TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Replace with your bot token
-CHAT_ID = "YOUR_CHAT_ID"  # Replace with your chat ID
+# ====== CONFIG ======
+FLIPKART_URL = "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH"
+TARGET_PRICE = 60000  # Set your desired alert price
 
-# --- SEND TELEGRAM ALERT ---
-def send_telegram_message(msg):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
+TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
+CHECK_INTERVAL = 3600  # seconds between checks
+# =====================
 
-# --- SELENIUM SETUP ---
-chrome_options = Options()
-# chrome_options.add_argument("--headless=new")  # Uncomment for headless mode
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-chrome_options.add_argument("--disable-infobars")
-chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-chrome_options.add_experimental_option('useAutomationExtension', False)
+def send_telegram_message(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    requests.post(url, data=data)
 
-# ✅ Use a unique temporary Chrome profile to avoid "already in use" errors
-chrome_options.add_argument(f"--user-data-dir={tempfile.mkdtemp()}")
+def get_price():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("--disable-infobars")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
 
-service = Service("/usr/local/bin/chromedriver")
-driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.get(FLIPKART_URL)
+    time.sleep(5)  # Wait for page to load fully
 
-try:
-    driver.get(PRODUCT_URL)
-    time.sleep(2)
-
-    # Close login popup if it appears
     try:
-        webdriver.ActionChains(driver).send_keys(Keys.ESCAPE).perform()
-        time.sleep(1)
-    except:
-        pass
+        price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
+        price_text = price_element.text.replace("₹", "").replace(",", "")
+        driver.quit()
+        return int(price_text)
+    except Exception as e:
+        driver.quit()
+        print("Error fetching price:", e)
+        return None
 
-    # Wait for price element to be visible
-    wait = WebDriverWait(driver, 15)
-    price_element = wait.until(
-        EC.visibility_of_element_located((By.CSS_SELECTOR, "div._30jeq3._16Jk6d"))
-    )
+def main():
+    while True:
+        print("Checking price...")
+        price = get_price()
+        if price:
+            print(f"Current price: ₹{price}")
+            if price <= TARGET_PRICE:
+                send_telegram_message(f"Price Alert! Current price is ₹{price}\n{FLIPKART_URL}")
+                print("Alert sent to Telegram!")
+        else:
+            print("Failed to fetch price.")
+        
+        time.sleep(CHECK_INTERVAL)
 
-    price_text = price_element.text.replace("₹", "").replace(",", "").strip()
-    current_price = int(price_text)
-    print(f"Current price: ₹{current_price}")
-
-    # Check price threshold
-    if current_price <= TARGET_PRICE:
-        send_telegram_message(f"🎉 Price Alert! Samsung S24 is now ₹{current_price}.\n{PRODUCT_URL}")
-    else:
-        print("No price drop yet.")
-
-except Exception as e:
-    print(f"Error: {e}")
-
-finally:
-    driver.quit()
+if __name__ == "__main__":
+    main()
