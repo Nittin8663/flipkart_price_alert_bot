@@ -11,15 +11,13 @@ from selenium.webdriver.common.by import By
 with open("config.json") as f:
     config = json.load(f)
 
-# Telegram settings
 TELEGRAM_BOT_TOKEN = config["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = config["TELEGRAM_CHAT_ID"]
 CHECK_INTERVAL = config["CHECK_INTERVAL"]
 
-# Flask app
 app = Flask(__name__)
 
-# HTML Template
+# HTML Template for main page
 HTML = """
 <!DOCTYPE html>
 <html>
@@ -46,7 +44,8 @@ button { padding: 5px 10px; }
 <td>{{ '✅' if p.enabled else '❌' }}</td>
 <td>
 <a href="/toggle/{{ loop.index0 }}">Toggle</a> |
-<a href="/delete/{{ loop.index0 }}">Delete</a>
+<a href="/delete/{{ loop.index0 }}">Delete</a> |
+<a href="/edit/{{ loop.index0 }}">Edit Price</a>
 </td>
 </tr>
 {% endfor %}
@@ -57,6 +56,28 @@ button { padding: 5px 10px; }
 <input type="text" name="url" placeholder="Flipkart URL" required>
 <input type="number" name="target_price" placeholder="Target Price" required>
 <button type="submit">Add</button>
+</form>
+</body>
+</html>
+"""
+
+# HTML Template for editing target price
+EDIT_HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>Edit Target Price</title>
+<style>
+body { font-family: Arial; margin: 40px; }
+input[type=number] { width: 100%; padding: 5px; }
+button { padding: 5px 10px; }
+</style>
+</head>
+<body>
+<h2>Edit Target Price for {{ product.name }}</h2>
+<form method="post" action="/edit/{{ index }}">
+<input type="number" name="target_price" value="{{ product.target_price }}" required>
+<button type="submit">Save</button>
 </form>
 </body>
 </html>
@@ -136,6 +157,16 @@ def toggle(index):
     products[index]["enabled"] = not products[index]["enabled"]
     save_products(products)
     return redirect("/")
+
+@app.route("/edit/<int:index>", methods=["GET", "POST"])
+def edit(index):
+    products = load_products()
+    if request.method == "POST":
+        products[index]["target_price"] = int(request.form["target_price"])
+        save_products(products)
+        return redirect("/")
+    else:
+        return render_template_string(EDIT_HTML, product=products[index], index=index)
 
 if __name__ == "__main__":
     threading.Thread(target=price_checker, daemon=True).start()
