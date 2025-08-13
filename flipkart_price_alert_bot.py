@@ -11,7 +11,33 @@ with open("config.json", "r") as f:
 
 CHECK_INTERVAL = config["check_interval"]
 
-def get_price(url):
+def get_prices(driver, products):
+    results = []
+    for product in products:
+        name = product.get("name", "Unknown Product")
+        url = product["url"]
+        target_price = product["target_price"]
+
+        print(f"\nChecking price for: {name}")
+        print(f"Product link: {url}")
+
+        try:
+            driver.get(url)
+            time.sleep(5)  # wait for page load
+
+            price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
+            price_text = price_element.text.replace("₹", "").replace(",", "")
+            price = int(price_text)
+            print(f"Current price: ₹{price}")
+
+            if price <= target_price:
+                send_telegram_message(f"📢 Price Alert! {name} is now ₹{price}\n{url}")
+                print("Alert sent to Telegram!")
+
+        except Exception as e:
+            print(f"Error fetching price for {name}: {e}")
+
+def main():
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
@@ -21,40 +47,11 @@ def get_price(url):
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
-    time.sleep(5)
-
-    try:
-        price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
-        price_text = price_element.text.replace("₹", "").replace(",", "")
-        driver.quit()
-        return int(price_text)
-    except Exception as e:
-        driver.quit()
-        print(f"Error fetching price for {url}: {e}")
-        return None
-
-def main():
     while True:
-        for product in config["products"]:
-            name = product.get("name", "Unknown Product")
-            url = product["url"]
-            target_price = product["target_price"]
+        driver = webdriver.Chrome(options=chrome_options)  # open once per cycle
+        get_prices(driver, config["products"])
+        driver.quit()  # close after all products are checked
 
-            print(f"\nChecking price for: {name}")
-            print(f"Product link: {url}")
-
-            price = get_price(url)
-
-            if price:
-                print(f"Current price: ₹{price}")
-                if price <= target_price:
-                    send_telegram_message(f"📢 Price Alert! {name} is now ₹{price}\n{url}")
-                    print("Alert sent to Telegram!")
-            else:
-                print("Failed to fetch price.")
-        
         time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
