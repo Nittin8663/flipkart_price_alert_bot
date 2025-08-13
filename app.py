@@ -3,7 +3,9 @@ import threading
 import time
 import requests
 from flask import Flask, render_template, request, redirect
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
 # ------------------ CONFIG ------------------ #
 TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
@@ -33,19 +35,25 @@ def send_telegram_message(message):
     except Exception as e:
         print(f"Error sending Telegram message: {e}")
 
+# ------------------ Selenium Price Fetch ------------------ #
 def get_price(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    driver = webdriver.Chrome(options=options)
     try:
-        r = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-        # Try multiple selectors in case Flipkart changes class
-        price_tag = soup.select_one("._30jeq3._16Jk6d") or soup.select_one("div._30jeq3")
-        if price_tag:
-            price_text = price_tag.text.replace("₹", "").replace(",", "").strip()
-            return int(price_text)
+        driver.get(url)
+        time.sleep(5)  # wait for JS to load
+        price_tag = driver.find_element(By.CSS_SELECTOR, "._30jeq3._16Jk6d")
+        price_text = price_tag.text.replace("₹", "").replace(",", "").strip()
+        return int(price_text)
     except Exception as e:
         print(f"Error fetching price for {url}: {e}")
-    return None
+        return None
+    finally:
+        driver.quit()
 
 # ------------------ Price Checker ------------------ #
 def price_checker():
@@ -103,7 +111,7 @@ def edit(index):
         products[index]["name"] = request.form["name"]
         products[index]["url"] = request.form["url"]
         products[index]["target_price"] = int(request.form["target_price"])
-        products[index]["alert_sent"] = False  # reset alert
+        products[index]["alert_sent"] = False
     save_products(products)
     return redirect("/")
 
