@@ -1,51 +1,41 @@
-import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 import requests
+from bs4 import BeautifulSoup
 
-# --- CONFIGURATION ---
-FLIPKART_PRODUCT_URL = "https://www.flipkart.com/samsung-galaxy-s24-5g-onyx-black-128-gb/p/itmc8add40b88912?pid=MOBHYJ6QFUNQYFDH&lid=LSTMOBHYJ6QFUNQYFDHVZACEH&marketplace=FLIPKART&q=s24&store=tyy%2F4io&srno=s_1_2&otracker=search&otracker1=search&fm=organic&iid=d4afac7f-f2f2-49fe-b92f-10c5966135f9.MOBHYJ6QFUNQYFDH.SEARCH&ppt=None&ppn=None&ssid=gtzu13tw8g0000001755064743419&qH=08eca8f85ffc96a4"  # Change to your product URL
-PRICE_THRESHOLD = 1000  # Update to your desired price
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
-CHECK_INTERVAL = 600  # seconds between checks
+# --- CONFIG ---
+PRODUCT_URL = "https://www.flipkart.com/apple-iphone-15-pro-max-blue-titanium-256-gb/p/itm6e1c11f5b6f0e"  # change to your product URL
+TARGET_PRICE = 150000  # change to your desired price
+TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+CHAT_ID = "YOUR_CHAT_ID"
 
-def get_price(driver):
-    driver.get(FLIPKART_PRODUCT_URL)
-    time.sleep(3)  # wait for page to load
-    try:
-        price_element = driver.find_element(By.CSS_SELECTOR, "._30jeq3._16Jk6d")
-        price_text = price_element.text.replace("₹", "").replace(",", "").strip()
-        price = int(price_text)
-        return price
-    except Exception as e:
-        print("Error fetching price:", e)
-        return None
-
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message
+# --- FUNCTIONS ---
+def get_price():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139 Safari/537.36"
     }
-    requests.post(url, data=payload)
+    resp = requests.get(PRODUCT_URL, headers=headers)
+    soup = BeautifulSoup(resp.text, "lxml")
 
-def main():
-    driver = webdriver.Chrome()  # Ensure chromedriver is in PATH
-    try:
-        while True:
-            price = get_price(driver)
-            if price is not None:
-                print(f"Current price: ₹{price}")
-                if price < PRICE_THRESHOLD:
-                    send_telegram_message(f"Flipkart Price Alert!\nPrice dropped to ₹{price}\n{FLIPKART_PRODUCT_URL}")
-                    print("Telegram notification sent!")
-                    break
-            else:
-                print("Could not fetch price. Retrying...")
-            time.sleep(CHECK_INTERVAL)
-    finally:
-        driver.quit()
+    price_tag = soup.find("div", class_="_30jeq3 _16Jk6d")
+    if not price_tag:
+        raise Exception("Price element not found! The page structure might have changed.")
 
+    price = int(price_tag.text.replace("₹", "").replace(",", "").strip())
+    return price
+
+def send_telegram_message(msg):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    data = {"chat_id": CHAT_ID, "text": msg}
+    requests.post(url, data=data)
+
+# --- MAIN ---
 if __name__ == "__main__":
-    main()
+    try:
+        current_price = get_price()
+        print(f"Current price: ₹{current_price}")
+
+        if current_price <= TARGET_PRICE:
+            send_telegram_message(f"🎉 Price Alert! The product is now ₹{current_price}.\n{PRODUCT_URL}")
+        else:
+            print("No price drop yet.")
+    except Exception as e:
+        print(f"Error: {e}")
