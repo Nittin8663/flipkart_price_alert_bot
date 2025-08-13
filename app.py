@@ -6,6 +6,8 @@ from flask import Flask, render_template, request, redirect
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # ------------------ CONFIG ------------------ #
 TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
@@ -43,10 +45,18 @@ def get_price(url):
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
     driver = webdriver.Chrome(options=options)
+    
     try:
         driver.get(url)
-        time.sleep(5)  # wait for JS to load
-        price_tag = driver.find_element(By.CSS_SELECTOR, "._30jeq3._16Jk6d")
+        wait = WebDriverWait(driver, 15)  # wait up to 15 seconds for price
+
+        # Try first selector
+        try:
+            price_tag = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "._30jeq3._16Jk6d")))
+        except:
+            # Alternative selector if class changed
+            price_tag = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "._30jeq3")))
+        
         price_text = price_tag.text.replace("₹", "").replace(",", "").strip()
         return int(price_text)
     except Exception as e:
