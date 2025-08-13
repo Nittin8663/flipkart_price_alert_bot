@@ -38,11 +38,13 @@ def get_price(url):
     try:
         r = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
-        price_tag = soup.select_one("._30jeq3._16Jk6d")  # Flipkart price selector
+        # Try multiple selectors in case Flipkart changes class
+        price_tag = soup.select_one("._30jeq3._16Jk6d") or soup.select_one("div._30jeq3")
         if price_tag:
-            return int(price_tag.text.replace("₹", "").replace(",", "").strip())
+            price_text = price_tag.text.replace("₹", "").replace(",", "").strip()
+            return int(price_text)
     except Exception as e:
-        print(f"Error fetching price: {e}")
+        print(f"Error fetching price for {url}: {e}")
     return None
 
 # ------------------ Price Checker ------------------ #
@@ -59,10 +61,12 @@ def price_checker():
             if price is not None:
                 print(f"Checking price for: {p['name']}")
                 print(f"Current price: ₹{price}")
-                if price <= p["target_price"]:
+                if price <= p["target_price"] and not p.get("alert_sent", False):
                     send_telegram_message(
                         f"Price Alert! {p['name']} is now ₹{price}\n{p['url']}"
                     )
+                    p["alert_sent"] = True  # Prevent repeated messages
+
         save_products(products)
         time.sleep(CHECK_INTERVAL)
 
@@ -70,7 +74,6 @@ def price_checker():
 @app.route("/")
 def index():
     products = load_products()
-    # Fetch current price on page load
     for p in products:
         try:
             p["current_price"] = get_price(p["url"])
@@ -87,7 +90,8 @@ def add():
         "url": request.form["url"],
         "target_price": int(request.form["target_price"]),
         "enabled": True,
-        "current_price": None
+        "current_price": None,
+        "alert_sent": False
     })
     save_products(products)
     return redirect("/")
@@ -99,6 +103,7 @@ def edit(index):
         products[index]["name"] = request.form["name"]
         products[index]["url"] = request.form["url"]
         products[index]["target_price"] = int(request.form["target_price"])
+        products[index]["alert_sent"] = False  # reset alert
     save_products(products)
     return redirect("/")
 
