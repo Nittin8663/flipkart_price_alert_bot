@@ -1,102 +1,108 @@
-import json
-import time
-import threading
-import requests
 from flask import Flask, render_template, request, redirect
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-
-# ====== CONFIG ======
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
-CHECK_INTERVAL = 3600  # seconds between checks
-PRODUCTS_FILE = "products.json"
-# ====================
+import threading
+import time
+import json
+import requests
+from bs4 import BeautifulSoup
+import re
 
 app = Flask(__name__)
 
-# ====== Helper Functions ======
+# === CONFIG ===
+BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+CHAT_ID = "YOUR_TELEGRAM_CHAT_ID"
+PRODUCTS_FILE = "products.json"
+
+# === UTILS ===
 def load_products():
-    with open(PRODUCTS_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(PRODUCTS_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
 
 def save_products(products):
     with open(PRODUCTS_FILE, "w") as f:
-        json.dump(products, f, indent=4)
+        json.dump(products, f, indent=2)
 
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    requests.post(url, data=data)
-
-def get_price(url):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
-    time.sleep(5)
+def send_telegram(msg):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    data = {"chat_id": CHAT_ID, "text": msg}
     try:
-        price_element = driver.find_element(By.CSS_SELECTOR, "div.Nx9bqj.CxhGGd")
-        price_text = price_element.text.replace("₹", "").replace(",", "")
-        driver.quit()
-        return int(price_text)
-    except:
-        driver.quit()
-        return None
+        r = requests.post(url, data=data, timeout=10)
+        print("Telegram response:", r.text)
+    except Exception as e:
+        print("Telegram send error:", e)
 
-# ====== Price Checker Thread ======
+def get_flipkart_price(url):
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        price_tag = soup.find("div", {"class": re.compile(r"_30jeq3|_16Jk6d")})
+        if price_tag:
+            price_str = price_tag.get_text().replace("₹", "").replace(",", "").strip()
+            return int(price_str)
+    except Exception as e:
+        print(f"Error fetching price for {url}: {e}")
+    return None
+
+# === PRICE CHECKER THREAD ===
 def price_checker():
     while True:
         products = load_products()
-        for product in products:
-            print(f"Checking price for: {product['name']}")
-            price = get_price(product['url'])
-            if price:
-                print(f"Current price: ₹{price}")
-                if price <= product['target_price']:
-                    send_telegram_message(f"Price Alert! {product['name']} is ₹{price}\n{product['url']}")
-                    print("Alert sent to Telegram!")
-        time.sleep(CHECK_INTERVAL)
+        for p in products:
+            if not p.get("enabled", True):
+                continue
+            current_price = get_flipkart_price(p["url"])
+            if current_price is not None:
+                print(f"Checking price for {p['name']} - ₹{current_price}")
+                if current_price <= p["target_price"]:
+                    send_telegram(f"Price alert! {p['name']} is ₹{current_price}\n{p['url']}")
+        time.sleep(60)  # check every 60s
 
-# ====== Flask Routes ======
+# === WEB ROUTES ===
 @app.route("/")
 def index():
-    products = load_products()
-    return render_template("index.html", products=products)
+    return render_template("index.html", products=load_products())
 
 @app.route("/add", methods=["POST"])
 def add_product():
-    name = request.form["name"]
-    url = request.form["url"]
-    target_price = int(request.form["target_price"])
     products = load_products()
-    products.append({"name": name, "url": url, "target_price": target_price})
+    products.append({
+        "name": request.form["name"],
+        "url": request.form["url"],
+        "target_price": int(request.form["target_price"]),
+        "enabled": True
+    })
     save_products(products)
     return redirect("/")
 
-@app.route("/delete/<int:product_index>")
-def delete_product(product_index):
+@app.route("/edit/<int:index>", methods=["POST"])
+def edit_product(index):
     products = load_products()
-    if 0 <= product_index < len(products):
-        products.pop(product_index)
-        save_products(products)
+    products[index]["name"] = request.form["name"]
+    products[index]["url"] = request.form["url"]
+    products[index]["target_price"] = int(request.form["target_price"])
+    save_products(products)
     return redirect("/")
 
-@app.route("/edit/<int:product_index>", methods=["POST"])
-def edit_product(product_index):
+@app.route("/delete/<int:index>")
+def delete_product(index):
     products = load_products()
-    if 0 <= product_index < len(products):
-        products[product_index]["target_price"] = int(request.form["target_price"])
-        save_products(products)
+    products.pop(index)
+    save_products(products)
     return redirect("/")
 
-# ====== Run Price Checker in Background ======
-checker_thread = threading.Thread(target=price_checker, daemon=True)
-checker_thread.start()
+@app.route("/toggle/<int:index>")
+def toggle_product(index):
+    products = load_products()
+    products[index]["enabled"] = not products[index].get("enabled", True)
+    save_products(products)
+    return redirect("/")
 
+# === START APP ===
 if __name__ == "__main__":
+    t = threading.Thread(target=price_checker, daemon=True)
+    t.start()
     app.run(host="0.0.0.0", port=5000)
