@@ -3,11 +3,13 @@ import threading
 import time
 import requests
 from flask import Flask, render_template, request, redirect
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+# Use undetected_chromedriver if you face bot detection issues
+import undetected_chromedriver as uc
 
 # ------------------ CONFIG ------------------ #
 TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
@@ -44,21 +46,31 @@ def get_price(url):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    driver = webdriver.Chrome(options=options)
     
+    driver = uc.Chrome(options=options)  # undetected Chrome
+
     try:
         driver.get(url)
-        wait = WebDriverWait(driver, 15)  # wait up to 15 seconds for price
+        wait = WebDriverWait(driver, 15)
 
-        # Try first selector
-        try:
-            price_tag = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "._30jeq3._16Jk6d")))
-        except:
-            # Alternative selector if class changed
-            price_tag = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "._30jeq3")))
-        
+        # possible price selectors
+        selectors = ["._30jeq3._16Jk6d", "._30jeq3", "._16Jk6d", "._1vC4OE._3qQ9m1"]
+        price_tag = None
+        for sel in selectors:
+            try:
+                price_tag = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, sel)))
+                if price_tag:
+                    break
+            except:
+                continue
+
+        if not price_tag:
+            print(f"Price element not found for {url}")
+            return None
+
         price_text = price_tag.text.replace("₹", "").replace(",", "").strip()
         return int(price_text)
+
     except Exception as e:
         print(f"Error fetching price for {url}: {e}")
         return None
@@ -83,7 +95,7 @@ def price_checker():
                     send_telegram_message(
                         f"Price Alert! {p['name']} is now ₹{price}\n{p['url']}"
                     )
-                    p["alert_sent"] = True  # Prevent repeated messages
+                    p["alert_sent"] = True
 
         save_products(products)
         time.sleep(CHECK_INTERVAL)
